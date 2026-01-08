@@ -1,0 +1,29 @@
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Bb]in/
+[Oo]bj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+*.nupkg
+packages/
+
+# Logs
+*.log
+debug.log
+crash_log.txt
+
+# Sensitive configuration - DO NOT COMMIT CREDENTIALS
+**/appsettings.json
+
+# Keep the template
+!**/appsettings.template.json

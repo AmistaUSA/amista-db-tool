@@ -11,13 +11,13 @@ static class Program
 
         try
         {
-            File.AppendAllText("debug.log", $"[{DateTime.Now}] Application Starting...\n");
+            SecureLogger.LogStartup();
             ApplicationConfiguration.Initialize();
             Application.Run(new MainForm());
         }
         catch (Exception ex)
         {
-             LogCrash(ex);
+            LogCrash(ex);
         }
     }
 
@@ -33,8 +33,11 @@ static class Program
 
     static void LogCrash(Exception? ex)
     {
-        string message = $"CRASH at {DateTime.Now}: {ex?.Message}\n{ex?.StackTrace}\n\n";
-        File.AppendAllText("crash_log.txt", message);
-        MessageBox.Show($"Application Crashed! see crash_log.txt. Error: {ex?.Message}");
+        SecureLogger.LogCrash(ex);
+        var logDir = SecureLogger.GetLogDirectory();
+        MessageBox.Show($"Application crashed. Error: {ex?.Message}\n\nLogs saved to: {logDir}",
+                        "Application Error",
+                        MessageBoxButtons.OK,
+                        MessageBoxIcon.Error);
     }
 }
