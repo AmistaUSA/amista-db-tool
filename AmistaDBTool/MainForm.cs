@@ -45,8 +45,26 @@ namespace AmistaDBTool
         {
             try
             {
+                var basePath = AppDomain.CurrentDomain.BaseDirectory;
+                var configPath = Path.Combine(basePath, "appsettings.json");
+                var templatePath = Path.Combine(basePath, "appsettings.template.json");
+
+                // Auto-create config from template if missing
+                if (!File.Exists(configPath) && File.Exists(templatePath))
+                {
+                    try 
+                    {
+                        File.Copy(templatePath, configPath);
+                        SecureLogger.LogDebug("Created appsettings.json from template.");
+                    }
+                    catch (Exception ex)
+                    {
+                        SecureLogger.LogError($"Failed to create config from template: {ex.Message}");
+                    }
+                }
+
                 var builder = new ConfigurationBuilder()
-                    .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                    .SetBasePath(basePath)
                     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
 
                 _config = builder.Build();
@@ -141,35 +159,58 @@ namespace AmistaDBTool
             }
         }
 
+        private const string EncryptionPrefix = "ENC:";
+
         private string ProtectPassword(string plainText)
         {
             if (string.IsNullOrEmpty(plainText)) return plainText;
+
+            // If already encrypted (has prefix), return as-is
+            if (plainText.StartsWith(EncryptionPrefix))
+                return plainText;
+
             try
             {
                 byte[] data = Encoding.UTF8.GetBytes(plainText);
                 byte[] encrypted = ProtectedData.Protect(data, null, DataProtectionScope.CurrentUser);
-                return Convert.ToBase64String(encrypted);
+                return EncryptionPrefix + Convert.ToBase64String(encrypted);
             }
-            catch
+            catch (Exception ex)
             {
-                return plainText;
+                // SECURITY FIX: Never fall back to plaintext - fail explicitly
+                SecureLogger.LogError($"Password encryption failed: {ex.Message}");
+                throw new CryptographicException(
+                    "Failed to encrypt password. Credentials will not be saved in plaintext for security reasons. " +
+                    "Please ensure Windows Data Protection is available.", ex);
             }
         }
 
         private string UnprotectPassword(string encryptedText)
         {
             if (string.IsNullOrEmpty(encryptedText)) return encryptedText;
-            try
+
+            // Check for encryption prefix
+            if (encryptedText.StartsWith(EncryptionPrefix))
             {
-                byte[] encrypted = Convert.FromBase64String(encryptedText);
-                byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
-                return Encoding.UTF8.GetString(decrypted);
+                try
+                {
+                    string base64 = encryptedText.Substring(EncryptionPrefix.Length);
+                    byte[] encrypted = Convert.FromBase64String(base64);
+                    byte[] decrypted = ProtectedData.Unprotect(encrypted, null, DataProtectionScope.CurrentUser);
+                    return Encoding.UTF8.GetString(decrypted);
+                }
+                catch (Exception ex)
+                {
+                    SecureLogger.LogError($"Password decryption failed: {ex.Message}");
+                    throw new CryptographicException(
+                        "Failed to decrypt password. The password may have been encrypted by a different user account.", ex);
+                }
             }
-            catch
-            {
-                // Not encrypted yet (plain text) - return as is
-                return encryptedText;
-            }
+
+            // Legacy plaintext password detected - log warning and return as-is for migration
+            // The password will be encrypted when credentials are next saved
+            SecureLogger.LogWarning("Plaintext password detected in configuration. It will be encrypted on next save.");
+            return encryptedText;
         }
 
         private void Log(string message)

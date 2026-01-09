@@ -7,7 +7,21 @@
     <UseWindowsForms>true</UseWindowsForms>
     <ImplicitUsings>enable</ImplicitUsings>
     <PlatformTarget>x64</PlatformTarget>
+    <EnableDefaultItems>false</EnableDefaultItems>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="MainForm.cs" />
+    <Compile Include="JobManager.cs" />
+    <Compile Include="SapConnector.cs" />
+    <Compile Include="SapConnectionException.cs" />
+    <Compile Include="SecureLogger.cs" />
+    
+    <EmbeddedResource Include="MainForm.resx">
+      <DependentUpon>MainForm.cs</DependentUpon>
+    </EmbeddedResource>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ExcelDataReader" Version="3.7.0" />
@@ -26,9 +40,35 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="appsettings.json">
+    <None Include="appsettings.json" Condition="Exists('appsettings.json')">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="appsettings.template.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+  <!--
+    Installer Build Targets
+
+    Usage from command line:
+      build-installer.cmd              - Full build (publish + installer)
+      build-installer.cmd -SkipPublish - Only compile installer
+
+    Usage from MSBuild/Visual Studio:
+      dotnet msbuild -t:CreateInstaller  - Calls the build script
+  -->
+
+  <!-- Create installer using build script -->
+  <Target Name="CreateInstaller">
+    <Message Importance="high" Text="Building installer..." />
+    <Exec Command="&quot;$(ProjectDir)build-installer.cmd&quot;" WorkingDirectory="$(ProjectDir)" />
+  </Target>
+
+  <!-- Compile Inno Setup installer only (assumes already published) -->
+  <Target Name="CompileInstaller">
+    <Message Importance="high" Text="Compiling installer only (skipping publish)..." />
+    <Exec Command="&quot;$(ProjectDir)build-installer.cmd&quot; -SkipPublish" WorkingDirectory="$(ProjectDir)" />
+  </Target>
 
 </Project>

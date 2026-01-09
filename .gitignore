@@ -6,6 +6,11 @@ x86/
 [Bb]in/
 [Oo]bj/
 
+# Publish output
+**/publish/
+**/publish_single/
+**/publish*/
+
 # Visual Studio
 .vs/
 *.user

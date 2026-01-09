@@ -63,6 +63,14 @@ namespace AmistaDBTool
         }
 
         /// <summary>
+        /// Logs a warning message with timestamp.
+        /// </summary>
+        public static void LogWarning(string message)
+        {
+            WriteLog(DebugLogPath, "WARN", message);
+        }
+
+        /// <summary>
         /// Logs a crash with full exception details.
         /// </summary>
         public static void LogCrash(Exception? ex)

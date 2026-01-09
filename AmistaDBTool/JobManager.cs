@@ -16,9 +16,10 @@ namespace AmistaDBTool
         private readonly Action<int> _progress;
         private readonly SapConnector _sapConnector;
 
-        // Pattern for valid SAP codes: alphanumeric, hyphens, underscores, dots, spaces
-        private static readonly Regex ValidCodePattern = new Regex(@"^[a-zA-Z0-9\-_\.\s]+$", RegexOptions.Compiled);
-        private const int MaxCodeLength = 100;
+        // Pattern for valid SAP codes: alphanumeric, hyphens, underscores only
+        // Removed dots and spaces to reduce SQL injection attack surface
+        private static readonly Regex ValidCodePattern = new Regex(@"^[a-zA-Z0-9\-_]+$", RegexOptions.Compiled);
+        private const int MaxCodeLength = 50; // SAP B1 codes are typically max 15-20 chars
 
         // File validation constants
         private static readonly string[] AllowedExtensions = { ".xls", ".xlsx" };
@@ -42,12 +43,53 @@ namespace AmistaDBTool
         }
 
         /// <summary>
-        /// Escapes single quotes for SQL (defense in depth).
+        /// Escapes and sanitizes value for SQL (defense in depth).
+        /// Handles multiple SQL injection vectors including quotes, comments, and control characters.
         /// </summary>
         private string EscapeSql(string value)
         {
             if (string.IsNullOrEmpty(value)) return value;
-            return value.Replace("'", "''");
+
+            var sb = new StringBuilder(value.Length);
+            foreach (char c in value)
+            {
+                switch (c)
+                {
+                    case '\'': sb.Append("''"); break;      // Escape single quotes
+                    case '\\': sb.Append("\\\\"); break;    // Escape backslashes
+                    case '\0': break;                        // Remove null bytes
+                    case '\r': break;                        // Remove carriage returns
+                    case '\n': break;                        // Remove newlines
+                    case '\x1a': break;                      // Remove substitute char (EOF in some contexts)
+                    default:
+                        // Only allow printable ASCII characters
+                        if (c >= 32 && c <= 126)
+                            sb.Append(c);
+                        break;
+                }
+            }
+            return sb.ToString();
+        }
+
+        /// <summary>
+        /// Validates and sanitizes a SAP code for safe SQL usage.
+        /// Returns null if the code is invalid.
+        /// </summary>
+        private string ValidateAndSanitizeCode(string code)
+        {
+            if (string.IsNullOrWhiteSpace(code)) return null;
+
+            // Trim and normalize
+            string trimmed = code.Trim();
+
+            // Check length
+            if (trimmed.Length == 0 || trimmed.Length > MaxCodeLength) return null;
+
+            // Validate against whitelist pattern
+            if (!ValidCodePattern.IsMatch(trimmed)) return null;
+
+            // Apply SQL escaping as defense in depth
+            return EscapeSql(trimmed);
         }
 
         /// <summary>
@@ -125,25 +167,23 @@ namespace AmistaDBTool
                             {
                                 try
                                 {
-                                    string cardCode = row[0]?.ToString()?.Trim();
-                                    string itemCode = row[1]?.ToString()?.Trim();
+                                    string rawCardCode = row[0]?.ToString();
+                                    string rawItemCode = row[1]?.ToString();
 
-                                    if (string.IsNullOrEmpty(cardCode) || string.IsNullOrEmpty(itemCode))
+                                    // Validate and sanitize inputs - returns null if invalid
+                                    string safeCardCode = ValidateAndSanitizeCode(rawCardCode);
+                                    string safeItemCode = ValidateAndSanitizeCode(rawItemCode);
+
+                                    if (safeCardCode == null || safeItemCode == null)
                                     {
-                                        _logger($"Row {processed + 1}: Skipped due to missing data.");
+                                        _logger($"Row {processed + 1}: Skipped - invalid or missing CardCode/ItemCode.");
+                                        SecureLogger.LogWarning($"Row {processed + 1}: Input validation failed for potential SQL injection attempt.");
                                         continue;
                                     }
 
-                                    // Validate input to prevent SQL injection
-                                    if (!IsValidCode(cardCode) || !IsValidCode(itemCode))
-                                    {
-                                        _logger($"Row {processed + 1}: Skipped due to invalid characters in CardCode or ItemCode.");
-                                        continue;
-                                    }
-
-                                    // Escape SQL as defense in depth
-                                    string safeCardCode = EscapeSql(cardCode);
-                                    string safeItemCode = EscapeSql(itemCode);
+                                    // Store original trimmed values for SAP API calls (after validation)
+                                    string cardCode = rawCardCode.Trim();
+                                    string itemCode = rawItemCode.Trim();
 
                                     string query = $"SELECT \"Substitute\" FROM \"OSCN\" WHERE \"CardCode\" = '{safeCardCode}' AND \"ItemCode\" = '{safeItemCode}'";
                                     rs.DoQuery(query);
