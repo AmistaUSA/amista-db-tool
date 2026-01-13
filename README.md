@@ -67,6 +67,12 @@ dotnet restore
 dotnet build
 ```
 
+## Deploy
+
+1 - Set inno setup installation path on build-installer.ps1
+2 - dotnet -msbuild -t:CreateInstaller (In Visual Studio IDE, you can add it to Post-build event command line for Release configuration)
+3 - Generated setup will be available in AmistaDBTool\Output
+
 ## Usage
 
 1. Launch the application
@@ -88,6 +94,8 @@ AmistaDBTool/
 ├── appsettings.json       # Configuration file
 └── SAPBusinessOneSDK.dll  # SAP Business One SDK
 ```
+
+
 
 ## Logging
 
