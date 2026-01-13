@@ -1,4 +1,4 @@
-# Amista DB Tool
+# Amista DB Tooldolar
 
 A Windows desktop application for performing batch operations on SAP Business One databases using data from Excel files.
 
@@ -69,9 +69,9 @@ dotnet build
 
 ## Deploy
 
-1 - Set inno setup installation path on build-installer.ps1
-2 - dotnet -msbuild -t:CreateInstaller (In Visual Studio IDE, you can add it to Post-build event command line for Release configuration)
-3 - Generated setup will be available in AmistaDBTool\Output
+1. Set inno setup installation path on build-installer.ps1
+2. dotnet -msbuild -t:CreateInstaller (In Visual Studio IDE, you can add it to Post-build event command line for Release configuration)
+3. Generated setup will be available in AmistaDBTool\Output
 
 ## Usage
 
